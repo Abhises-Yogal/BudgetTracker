@@ -1,12 +1,10 @@
 import TransactionItem from "./TransactionItem";
 
-/**
- * TransactionList
- * A bordered card matching BalanceSummary's surface, with rows divided
- * by hairlines rather than separate cards — so the list reads as one
- * continuous statement rather than a stack of tiles.
- */
-export default function TransactionList({ transactions }) {
+// TransactionList
+// A bordered card matching BalanceSummary's surface, with rows divided by hairlines rather than separate cards — so the list reads as one continuous statement rather than a stack of tiles.
+// Passes onDelete into each row so items can remove themselves from state.
+
+export default function TransactionList({ transactions, onDelete }) {
   return (
     <section className="bg-surface border border-hairline rounded-sm">
       <div className="px-7 sm:px-9 py-5 border-b border-hairline">
@@ -20,7 +18,11 @@ export default function TransactionList({ transactions }) {
       ) : (
         <ul className="divide-y divide-hairline">
           {transactions.map((transaction) => (
-            <TransactionItem key={transaction.id} transaction={transaction} />
+            <TransactionItem
+              key={transaction.id} 
+              transaction={transaction} 
+              onDelete={onDelete} 
+            />
           ))}
         </ul>
       )}

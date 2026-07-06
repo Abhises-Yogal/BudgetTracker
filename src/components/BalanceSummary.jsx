@@ -1,12 +1,8 @@
 import { formatPlainAmount } from "../utils/formatCurrency";
 
-/**
- * BalanceSummary
- * Reads like the header of a bank statement: a net balance set in serif,
- * with income/expense totals beneath as two ledger columns separated by
- * a hairline. The double rule under the net figure is the one ornament
- * this component spends — everything else stays quiet.
- */
+// BalanceSummary
+// Reads like the header of a bank statement: a net balance set in serif, with income/expense totals beneath as two ledger columns separated by a hairline. The double rule under the net figure is the one ornament this component spends — everything else stays quiet.
+
 export default function BalanceSummary({ income, expenses }) {
   const net = income - expenses;
 
@@ -18,7 +14,7 @@ export default function BalanceSummary({ income, expenses }) {
 
       <p className="font-serif text-4xl sm:text-5xl text-ink tabular-nums">
         {formatPlainAmount(net)}
-        <span className="text-lg text-ink-soft ml-1 align-top">USD</span>
+        <span className="text-lg text-ink-soft ml-1 align-top">NPR</span>
       </p>
 
       {/* Signature double rule, ledger-style */}
