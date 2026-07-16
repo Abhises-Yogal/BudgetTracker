@@ -1,127 +1,180 @@
-// MODEL layer: owns the data and every operation on it.
-// No HTTP knowledge lives here: no req, no res, no status codes.
-// Swap the in-memory array for a DB client (pg, mongoose, etc.) by changing only this file.
+// MODEL layer: Mongoose schema + all data-access methods.
+// Controllers call only these exports; no mongoose code lives elsewhere.
+import mongoose from "mongoose";
 
-// Seed data
-let transactions = [
+// Transaction schema
+const transactionSchema = new mongoose.Schema(
   {
-    id: 1,
-    description: "Monthly salary",
-    category: "Salary",
-    date: "2026-06-01",
-    type: "income",
-    amount: 42000.0,
+    type: {
+      type: String,
+      enum: ["income", "expense"],
+      required: [true, "Type is required"],
+    },
+    amount: {
+      type: Number,
+      required: [true, "Amount is required"],
+      min: [0.01, "Amount must be greater than 0"],
+    },
+    category: {
+      type: String,
+      required: [true, "Category is required"],
+      enum: {
+        values: [
+          "Salary", "Freelance", "Investment", "Gift",
+          "Housing", "Food", "Transport", "Entertainment",
+          "Health", "Utilities", "Other",
+        ],
+        message: "{VALUE} is not a valid category",
+      },
+    },
+    description: {
+      type: String,
+      required: [true, "Description is required"],
+      trim: true,
+      maxlength: [120, "Description cannot exceed 120 characters"],
+    },
+    date: {
+      type: Date,
+      default: Date.now,
+    },
+    // userId reserved for auth; stored as a plain string for now so the
+    // schema is ready when you add JWT without a migration.
+    userId: {
+      type: String,
+      default: "default",
+      index: true,
+    },
   },
   {
-    id: 2,
-    description: "Rent - June",
-    category: "Housing",
-    date: "2026-06-02",
-    type: "expense",
-    amount: 14500.0,
-  },
-  {
-    id: 3,
-    description: "Freelance design work",
-    category: "Freelance",
-    date: "2026-06-05",
-    type: "income",
-    amount: 6200.0,
-  },
-  {
-    id: 4,
-    description: "Groceries - BBSM",
-    category: "Food",
-    date: "2026-06-08",
-    type: "expense",
-    amount: 960.42,
-  },
-  {
-    id: 5,
-    description: "Spotify subscription",
-    category: "Entertainment",
-    date: "2026-06-10",
-    type: "expense",
-    amount: 149.99,
-},
-];
+    timestamps: true, // adds createdAt + updatedAt automatically
+    toJSON: {
+      // Replace _id with id and drop __v in every JSON response
+      virtuals: true,
+      transform(_doc, ret) {
+        ret.id = ret._id;
+        delete ret._id;
+        delete ret.__v;
+        return ret;
+      },
+    },
+  }
+);
 
-let nextId = transactions.length + 1;
+// Index speeds up the month-filter query and the summary aggregation
+transactionSchema.index({ date: -1 });
+transactionSchema.index({ userId: 1, date: -1 });
+
+const Transaction = mongoose.model("Transaction", transactionSchema);
 
 // Model methods
 
 // findAll()
-// Returns all transactions sorted newest-first by id.
-export function findAll() {
-  return [...transactions].sort((a, b) => b.id - a.id);
+// Returns transactions newest-first, optionally filtered to a YYYY-MM month.
+export async function findAll({ month } = {}) {
+  const filter = buildDateFilter(month);
+  return Transaction.find(filter).sort({ date: -1 }).lean({ virtuals: true });
 }
 
-// findById(id)
-// Returns a single transaction or null if not found.
-export function findById(id) {
-  return transactions.find((t) => t.id === id) ?? null;
-}
-
-// create({ type, amount, category, description })
-// Inserts a new transaction and returns it with its generated id and date.
-export function create({ type, amount, category, description }) {
-  const transaction = {
-    id: nextId++,
-    type,
-    amount: parseFloat(amount),
-    category,
-    description: description.trim(),
-    date: new Date().toISOString().slice(0, 10),
-  };
-  transactions.push(transaction);
-  return transaction;
+// create(fields)
+// Inserts a new transaction and returns the saved document.
+export async function create(fields) {
+  const tx = await Transaction.create(fields);
+  return tx.toJSON();
 }
 
 // remove(id)
-// Deletes by id. Returns the deleted object or null if not found.
-export function remove(id) {
-  const index = transactions.findIndex((t) => t.id === id);
-  if (index === -1) return null;
-  const [deleted] = transactions.splice(index, 1);
-  return deleted;
+// Deletes by MongoDB_id. Returns the deleted doc or null.
+export async function remove(id) {
+  return Transaction.findByIdAndDelete(id).lean({ virtuals: true });
 }
 
-// getSummary()
-//Computes global totals and a per-category breakdown sorted by total desc. Pure calculation - no side effects.
-export function getSummary() {
-  let totalIncome = 0;
-  let totalExpenses = 0;
-  const categoryMap = {};
+// getSummary({ month })
+// MongoDB aggregation pipeline:
+// 1. Optional $match to filter by month
+// 2. $facet runs two sub-pipelines in parallel:
+//     - totals: one doc per type (income / expense)
+//     - byCategory: one doc per category with count + total
+// 3. Results are merged and rounded in JS
+export async function getSummary({ month } = {}) {
+  const matchStage = buildDateFilter(month);
 
-  for (const t of transactions) {
-    if (t.type === "income") {
-      totalIncome += t.amount;
-    } else {
-      totalExpenses += t.amount;
-    }
+  const [result] = await Transaction.aggregate([
+    // Only add $match when there's actually something to filter on
+    ...(Object.keys(matchStage).length ? [{ $match: matchStage }] : []),
 
-    if (!categoryMap[t.category]) {
-      categoryMap[t.category] = {
-        category: t.category,
-        type: t.type,
-        total: 0,
-        count: 0,
-      };
-    }
-    categoryMap[t.category].total += t.amount;
-    categoryMap[t.category].count += 1;
+    {
+      $facet: {
+        // Global income / expense totals
+        totals: [
+          {
+            $group: {
+              _id: "$type",
+              total: { $sum: "$amount" },
+              count: { $sum: 1 },
+            },
+          },
+        ],
+
+        // Per-category breakdown
+        byCategory: [
+          {
+            $group: {
+              _id: { category: "$category", type: "$type" },
+              total: { $sum: "$amount" },
+              count: { $sum: 1 },
+            },
+          },
+          { $sort: { total: -1 } },
+          {
+            $project: {
+              _id: 0,
+              category: "$_id.category",
+              type: "$_id.type",
+              total: 1,
+              count: 1,
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  // Flatten totals array → { income: N, expense: N }
+  const totalsMap = {};
+  for (const t of result.totals) {
+    totalsMap[t._id] = t.total;
   }
 
-  // Round to avoid floating-point drift (e.g. 1557.4099999...)
-  const round2 = (n) => Math.round(n * 100) / 100;
+  const totalIncome   = round2(totalsMap.income   ?? 0);
+  const totalExpenses = round2(totalsMap.expense  ?? 0);
 
   return {
-    totalIncome: round2(totalIncome),
-    totalExpenses: round2(totalExpenses),
+    totalIncome,
+    totalExpenses,
     netBalance: round2(totalIncome - totalExpenses),
-    transactionCount: transactions.length,
-    byCategory: Object.values(categoryMap)
-      .map((c) => ({ ...c, total: round2(c.total) }))
-      .sort((a, b) => b.total - a.total),
+    byCategory: result.byCategory.map((c) => ({
+      ...c,
+      total: round2(c.total),
+    })),
   };
 }
+
+// Helpers
+
+// buildDateFilter("2025-06")  →  { date: { $gte: Date, $lte: Date } } 
+// buildDateFilter(undefined)  →  {}
+function buildDateFilter(month) {
+  if (!month || !/^\d{4}-\d{2}$/.test(month)) return {};
+
+  const [year, mon] = month.split("-").map(Number);
+  const start = new Date(year, mon - 1, 1);           // first day 00:00:00
+  const end   = new Date(year, mon, 0, 23, 59, 59);   // last day 23:59:59
+
+  return { date: { $gte: start, $lte: end } };
+}
+
+function round2(n) {
+  return Math.round(n * 100) / 100;
+}
+
+export default Transaction;

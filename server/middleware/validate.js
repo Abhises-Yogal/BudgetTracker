@@ -41,8 +41,8 @@ export function validateTransaction(req, res, next) {
   }
 
   // Normalise so the route handler doesn't need to clean up
-  req.body.description = description.trim();
   req.body.amount = parsed;
+  req.body.description = description.trim();
 
   next();
 }

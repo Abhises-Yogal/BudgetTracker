@@ -1,60 +1,53 @@
-import { useMemo } from "react";
+// Renders a horizontal Recharts BarChart using the byCategory[] array returned directly from GET /api/transactions/summary - no local aggregation. The chart height scales with the number of categories.
+
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
+  BarChart, Bar, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, Cell,
 } from "recharts";
 
-// Colours assigned per category for visual consistency across renders.
-// Expense bars use muted brick tones; income bars use forest green.
-const INCOME_FILL = "#2F5D4F";
-const EXPENSE_FILL = "#9A3B3B";
-const EXPENSE_MUTED = "#C4837F"; // lighter for secondary bars
+const INCOME_COLOR  = "#2F5D4F";
+const EXPENSE_COLOR = "#9A3B3B";
+
+const numFmt = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 2, maximumFractionDigits: 2,
+});
+const compactFmt = new Intl.NumberFormat("en-US", {
+  notation: "compact", maximumFractionDigits: 1,
+});
 
 function CustomTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
-  const { name, value, type } = payload[0].payload;
+  const { category, total, type } = payload[0].payload;
+  const isIncome = type === "income";
   return (
     <div className="bg-surface border border-hairline px-3 py-2 rounded-sm shadow-sm">
-      <p className="font-mono text-[11px] uppercase tracking-[0.1em] text-ink-soft mb-0.5">
-        {name}
-      </p>
-      <p
-        className={`font-mono text-sm tabular-nums ${
-          type === "income" ? "text-income" : "text-expense"
-        }`}
-      >
-        {type === "income" ? "+" : "("}
-        {new Intl.NumberFormat("en-US", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }).format(value)}
-        {type === "expense" ? ")" : ""}
+      <p className="font-mono text-[11px] uppercase tracking-[0.1em] text-ink-soft mb-0.5">{category}</p>
+      <p className={`font-mono text-sm tabular-nums ${isIncome ? "text-income" : "text-expense"}`}>
+        {isIncome ? "+" : "("}{numFmt.format(total)}{isIncome ? "" : ")"}
       </p>
     </div>
   );
 }
 
-// SpendingChart
-// Aggregates transactions by category and renders a horizontal bar chart. Only expense categories are shown by default - income bars appear too in a muted green so the chart tells the full story without clutter. useMemo keeps the aggregation from re-running on every render.
+export default function SpendingChart({ byCategory = [], loading }) {
+  if (loading) {
+    return (
+      <section className="bg-surface border border-hairline rounded-sm">
+        <div className="px-7 sm:px-9 py-5 border-b border-hairline">
+          <div className="h-5 w-32 bg-hairline rounded animate-pulse" />
+        </div>
+        <div className="px-6 py-8">
+          <div className="space-y-3">
+            {[80, 60, 45, 30].map((w) => (
+              <div key={w} className="h-6 bg-hairline rounded animate-pulse" style={{ width: `${w}%` }} />
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
 
-export default function SpendingChart({ transactions }) {
-  const data = useMemo(() => {
-    const map = {};
-    for (const t of transactions) {
-      if (!map[t.category]) {
-        map[t.category] = { name: t.category, value: 0, type: t.type };
-      }
-      map[t.category].value += t.amount;
-    }
-    return Object.values(map).sort((a, b) => b.value - a.value);
-  }, [transactions]);
-
-  if (data.length === 0) return null;
+  if (!byCategory.length) return null;
 
   return (
     <section className="bg-surface border border-hairline rounded-sm">
@@ -63,76 +56,33 @@ export default function SpendingChart({ transactions }) {
       </div>
 
       <div className="px-4 sm:px-6 py-6">
-        <ResponsiveContainer width="100%" height={data.length * 44 + 16}>
-          <BarChart
-            data={data}
-            layout="vertical"
-            margin={{ top: 0, right: 48, bottom: 0, left: 72 }}
-            barCategoryGap="30%"
-          >
-            <XAxis
-              type="number"
-              tick={{
-                fontFamily: "'IBM Plex Mono', monospace",
-                fontSize: 10,
-                fill: "#6B6A66",
-              }}
-              tickFormatter={(v) =>
-                new Intl.NumberFormat("en-US", {
-                  notation: "compact",
-                  maximumFractionDigits: 1,
-                }).format(v)
-              }
-              axisLine={false}
-              tickLine={false}
-            />
-            <YAxis
-              type="category"
-              dataKey="name"
-              width={70}
-              tick={{
-                fontFamily: "'IBM Plex Mono', monospace",
-                fontSize: 10,
-                fill: "#1C1B19",
-              }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <Tooltip
-              content={<CustomTooltip />}
-              cursor={{ fill: "#F7F5F0" }}
-            />
-            <Bar dataKey="value" radius={[0, 2, 2, 0]}>
-              {data.map((entry) => (
-                <Cell
-                  key={entry.name}
-                  fill={entry.type === "income" ? INCOME_FILL : EXPENSE_FILL}
-                />
+        <ResponsiveContainer width="100%" height={byCategory.length * 44 + 16}>
+          <BarChart data={byCategory} layout="vertical"
+            margin={{ top: 0, right: 52, bottom: 0, left: 80 }} barCategoryGap="30%">
+            <XAxis type="number"
+              tick={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, fill: "#6B6A66" }}
+              tickFormatter={(v) => compactFmt.format(v)}
+              axisLine={false} tickLine={false} />
+            <YAxis type="category" dataKey="category" width={78}
+              tick={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, fill: "#1C1B19" }}
+              axisLine={false} tickLine={false} />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: "#F7F5F0" }} />
+            <Bar dataKey="total" radius={[0, 2, 2, 0]}>
+              {byCategory.map((entry) => (
+                <Cell key={entry.category}
+                  fill={entry.type === "income" ? INCOME_COLOR : EXPENSE_COLOR} />
               ))}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
 
-        {/* Legend */}
         <div className="flex items-center gap-5 mt-4 px-2">
-          <div className="flex items-center gap-1.5">
-            <div
-              className="w-2.5 h-2.5 rounded-sm"
-              style={{ background: INCOME_FILL }}
-            />
-            <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-ink-soft">
-              Income
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div
-              className="w-2.5 h-2.5 rounded-sm"
-              style={{ background: EXPENSE_FILL }}
-            />
-            <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-ink-soft">
-              Expense
-            </span>
-          </div>
+          {[["Income", INCOME_COLOR], ["Expense", EXPENSE_COLOR]].map(([label, color]) => (
+            <div key={label} className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-sm" style={{ background: color }} />
+              <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-ink-soft">{label}</span>
+            </div>
+          ))}
         </div>
       </div>
     </section>
