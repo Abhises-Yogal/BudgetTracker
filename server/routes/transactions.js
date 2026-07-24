@@ -7,10 +7,13 @@
 import { Router } from "express";
 import * as TransactionController from "../controllers/TransactionController.js";
 import { validateTransaction } from "../middleware/validate.js";
+import { requireAuth }         from "../middleware/auth.js";
 
 const router = Router();
 
 // /summary must be declared before /:id so Express doesn't treat the literal string "summary" as a numeric id parameter.
+router.use(requireAuth);
+
 router.get("/summary", TransactionController.getSummary);
 
 router.get("/", TransactionController.getAll);

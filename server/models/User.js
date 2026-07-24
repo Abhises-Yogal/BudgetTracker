@@ -1,0 +1,78 @@
+// MODEL layer: User schema, password hashing, and credential verification.
+// No HTTP knowledge lives here. Controllers call only the named exports.
+
+import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
+
+const userSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: [true, "Name is required"],
+      trim: true,
+      maxlength: [60, "Name cannot exceed 60 characters"],
+    },
+    email: {
+      type: String,
+      required: [true, "Email is required"],
+      unique: true,
+      lowercase: true,
+      trim: true,
+      match: [/^\S+@\S+\.\S+$/, "Enter a valid email address"],
+    },
+    password: {
+      type: String,
+      required: [true, "Password is required"],
+      minlength: [8, "Password must be at least 8 characters"],
+      // Never send the hashed password back to the client
+      select: false,
+    },
+  },
+  {
+    timestamps: true,
+    toJSON: {
+      virtuals: true,
+      transform(_doc, ret) {
+        ret.id = ret._id;
+        delete ret._id;
+        delete ret.__v;
+        delete ret.password; // extra safety: never leak the hash
+        return ret;
+      },
+    },
+  }
+);
+
+// Hash password before every save
+// Only re-hash when the password field was actually modified, so updating other fields (e.g. name) doesn't trigger an unnecessary bcrypt round.
+userSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
+  const salt = await bcrypt.genSalt(12);
+  this.password = await bcrypt.hash(this.password, salt);
+});
+
+const User = mongoose.model("User", userSchema);
+
+// Model methods
+
+// createUser({ name, email, password })
+// Inserts a new user. The pre-save hook hashes the password automatically.
+// Throws a Mongoose ValidationError if email is already taken (unique index).
+export async function createUser({ name, email, password }) {
+  const user = await User.create({ name, email, password });
+  return user.toJSON(); // password is stripped by the toJSON transform
+}
+
+// findByEmail(email)
+// Returns the user including the hashed password field (needed for login). Returns null if not found.
+export async function findByEmail(email) {
+  return User.findOne({ email: email.toLowerCase().trim() }).select("+password");
+}
+
+// verifyPassword(plain, hashed)
+// Compares a plain-text password against the stored bcrypt hash.
+export async function verifyPassword(plain, hashed) {
+  return bcrypt.compare(plain, hashed);
+}
+
+export default User;

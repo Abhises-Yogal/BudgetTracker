@@ -41,7 +41,7 @@ const transactionSchema = new mongoose.Schema(
     // schema is ready when you add JWT without a migration.
     userId: {
       type: String,
-      default: "default",
+      required: true,
       index: true,
     },
   },
@@ -61,7 +61,6 @@ const transactionSchema = new mongoose.Schema(
 );
 
 // Index speeds up the month-filter query and the summary aggregation
-transactionSchema.index({ date: -1 });
 transactionSchema.index({ userId: 1, date: -1 });
 
 const Transaction = mongoose.model("Transaction", transactionSchema);
@@ -70,8 +69,8 @@ const Transaction = mongoose.model("Transaction", transactionSchema);
 
 // findAll()
 // Returns transactions newest-first, optionally filtered to a YYYY-MM month.
-export async function findAll({ month } = {}) {
-  const filter = buildDateFilter(month);
+export async function findAll({ userId, month } = {}) {
+  const filter = { userId, ...buildDateFilter(month) };
   return Transaction.find(filter).sort({ date: -1 }).lean({ virtuals: true });
 }
 
@@ -82,40 +81,30 @@ export async function create(fields) {
   return tx.toJSON();
 }
 
-// remove(id)
+// remove(id, userId)
 // Deletes by MongoDB_id. Returns the deleted doc or null.
-export async function remove(id) {
-  return Transaction.findByIdAndDelete(id).lean({ virtuals: true });
+export async function remove(id, userId) {
+  // findOneAndDelete with userId prevents deleting another user's transaction
+  return Transaction.findOneAndDelete({ _id: id, userId }).lean({ virtuals: true });
 }
 
-// getSummary({ month })
+// getSummary({ userId, month })
 // MongoDB aggregation pipeline:
 // 1. Optional $match to filter by month
 // 2. $facet runs two sub-pipelines in parallel:
 //     - totals: one doc per type (income / expense)
 //     - byCategory: one doc per category with count + total
 // 3. Results are merged and rounded in JS
-export async function getSummary({ month } = {}) {
-  const matchStage = buildDateFilter(month);
+export async function getSummary({ userId, month } = {}) {
+  const matchFilter = { userId, ...buildDateFilter(month) };
 
   const [result] = await Transaction.aggregate([
-    // Only add $match when there's actually something to filter on
-    ...(Object.keys(matchStage).length ? [{ $match: matchStage }] : []),
-
+    { $match: matchFilter },
     {
       $facet: {
-        // Global income / expense totals
         totals: [
-          {
-            $group: {
-              _id: "$type",
-              total: { $sum: "$amount" },
-              count: { $sum: 1 },
-            },
-          },
+          { $group: { _id: "$type", total: { $sum: "$amount" }, count: { $sum: 1 } } },
         ],
-
-        // Per-category breakdown
         byCategory: [
           {
             $group: {
@@ -139,23 +128,17 @@ export async function getSummary({ month } = {}) {
     },
   ]);
 
-  // Flatten totals array → { income: N, expense: N }
   const totalsMap = {};
-  for (const t of result.totals) {
-    totalsMap[t._id] = t.total;
-  }
+  for (const t of result.totals) totalsMap[t._id] = t.total;
 
-  const totalIncome   = round2(totalsMap.income   ?? 0);
-  const totalExpenses = round2(totalsMap.expense  ?? 0);
+  const totalIncome   = round2(totalsMap.income  ?? 0);
+  const totalExpenses = round2(totalsMap.expense ?? 0);
 
   return {
     totalIncome,
     totalExpenses,
     netBalance: round2(totalIncome - totalExpenses),
-    byCategory: result.byCategory.map((c) => ({
-      ...c,
-      total: round2(c.total),
-    })),
+    byCategory: result.byCategory.map((c) => ({ ...c, total: round2(c.total) })),
   };
 }
 
@@ -165,12 +148,13 @@ export async function getSummary({ month } = {}) {
 // buildDateFilter(undefined)  →  {}
 function buildDateFilter(month) {
   if (!month || !/^\d{4}-\d{2}$/.test(month)) return {};
-
   const [year, mon] = month.split("-").map(Number);
-  const start = new Date(year, mon - 1, 1);           // first day 00:00:00
-  const end   = new Date(year, mon, 0, 23, 59, 59);   // last day 23:59:59
-
-  return { date: { $gte: start, $lte: end } };
+  return {
+    date: {
+      $gte: new Date(year, mon - 1, 1),
+      $lte: new Date(year, mon, 0, 23, 59, 59),
+    },
+  };
 }
 
 function round2(n) {

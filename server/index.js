@@ -1,20 +1,15 @@
 // Express entry point. Responsibilities: load env, configure app-level middleware, mount routes, handle 404s and uncaught errors. Nothing else lives here.
+// Boot order: load env → connect MongoDB → middleware → routes → listen.
 // Start with:
 // npm run server:dev   (nodemon, auto-restarts)
 // npm run server       (plain node)
 
-import dotenv from "dotenv";
-import { dirname, join } from "path";
-import { fileURLToPath } from "url";
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { connectDB } from "./config/db.js";
+import authRoutes        from "./routes/auth.js";
 import transactionRoutes from "./routes/transactions.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-dotenv.config({ path: join(__dirname, ".env") });
-dotenv.config({ path: join(__dirname, "..", ".env"), override: false });
 
 const PORT = process.env.PORT || 3001;
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
@@ -26,7 +21,7 @@ app.use(
   cors({
     origin: CLIENT_ORIGIN,
     methods: ["GET", "POST", "DELETE"],
-    allowedHeaders: ["Content-Type"],
+    allowedHeaders: ["Content-Type", "Authorization"], // Authorization added for JWT
   })
 );
 
@@ -42,6 +37,7 @@ app.get("/api/health", (_req, res) => {
 });
 
 // Routes 
+app.use("/api/auth",         authRoutes);
 app.use("/api/transactions", transactionRoutes);
 
 // 404 catch-all
@@ -62,9 +58,11 @@ async function start() {
     await connectDB();
     app.listen(PORT, () => {
       console.log(`
-  Budget Tracker API  (MVC + MongoDB)
+  Budget Tracker API
   ─────────────────────────────────────
   ➜  Health    GET  http://localhost:${PORT}/api/health
+  ➜  Register    POST http://localhost:${PORT}/api/auth/register
+  ➜  Login     POST http://localhost:${PORT}/api/auth/login
   ➜  List      GET  http://localhost:${PORT}/api/transactions?month=YYYY-MM
   ➜  Summary   GET  http://localhost:${PORT}/api/transactions/summary?month=YYYY-MM
   ➜  Create   POST  http://localhost:${PORT}/api/transactions

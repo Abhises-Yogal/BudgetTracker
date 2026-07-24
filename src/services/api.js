@@ -4,11 +4,46 @@
 
 import axios from "axios";
 
+const TOKEN_KEY = "bt_token";
+
 const api = axios.create({
   baseURL: "/api",
   headers: { "Content-Type": "application/json" },
   timeout: 8000,
 });
+
+// Request interceptor: inject token
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+// Response interceptor: handle expired / invalid token
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem("bt_user");
+      // Hard redirect: clears all React state cleanly
+      window.location.replace("/login");
+    }
+    return Promise.reject(error);
+  }
+);
+
+// Auth
+
+export async function registerUser({ name, email, password }) {
+  const { data } = await api.post("/auth/register", { name, email, password });
+  return data; // { ok, token, user }
+}
+
+export async function loginUser({ email, password }) {
+  const { data } = await api.post("/auth/login", { email, password });
+  return data; // { ok, token, user }
+}
 
 // Transactions
 
