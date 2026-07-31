@@ -58,7 +58,7 @@ export default function App() {
     if (loadingList || loadingChart) return;
     const net  = summary.netBalance;
     const sign = net >= 0 ? "+" : "–";
-    document.title = `${sign}${formatPlainAmount(Math.abs(net))} · Budget Tracker`;
+    document.title = `${sign}${formatPlainAmount(Math.abs(net))} · DimeTime`;
   }, [summary.netBalance, loadingList, loadingChart]);
 
   async function handleAdd(fields) {
@@ -95,7 +95,7 @@ export default function App() {
               <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-ink-soft mb-1">
                 Statement
               </p>
-              <h1 className="font-serif text-2xl text-ink">Budget tracker</h1>
+              <h1 className="font-serif text-2xl text-ink">DimeTime</h1>
             </div>
             <div className="text-right">
               <p className="font-mono text-[11px] text-ink-soft mb-1 truncate max-w-[160px]">

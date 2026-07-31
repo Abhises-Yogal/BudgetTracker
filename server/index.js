@@ -13,7 +13,11 @@ import authRoutes        from "./routes/auth.js";
 import transactionRoutes from "./routes/transactions.js";
 
 const PORT = process.env.PORT || 3001;
-const allowedOrigins = ["http://localhost:5173",process.env.FRONTEND_URL,].filter(Boolean);
+const allowedOrigins = [
+  "http://localhost:5173",
+  process.env.FRONTEND_URL,
+  process.env.CLIENT_ORIGIN,
+].filter(Boolean);
 
 const app = express();
 
@@ -34,12 +38,35 @@ app.use(
 app.use(express.json()); // parse application/json bodies
 app.use(cookieParser()); // parse cookies from incoming requests
 
-// Health check 
+// Health check and root redirect
 app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
     uptime: Math.round(process.uptime()),
     environment: process.env.NODE_ENV
+  });
+});
+
+// Root route: show API info instead of 404
+app.get("/", (_req, res) => {
+  res.json({
+    ok: true,
+    app: "DimeTime API",
+    version: "1.0.0",
+    docs: {
+      health: "/api/health",
+      auth: {
+        register: "POST /api/auth/register",
+        login: "POST /api/auth/login",
+        logout: "POST /api/auth/logout"
+      },
+      transactions: {
+        list: "GET /api/transactions?month=YYYY-MM",
+        summary: "GET /api/transactions/summary?month=YYYY-MM",
+        create: "POST /api/transactions",
+        delete: "DELETE /api/transactions/:id"
+      }
+    }
   });
 });
 
@@ -65,7 +92,7 @@ async function start() {
     await connectDB();
     app.listen(PORT, () => {
       console.log(`
-  Budget Tracker API
+  DimeTime API
   ─────────────────────────────────────
   ➜  POST   /api/auth/register
   ➜  POST   /api/auth/login
