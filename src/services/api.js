@@ -1,13 +1,13 @@
 // Single Axios instance for all API calls.
 // In development, Vite is configured to proxy /api/* to localhost:3001.
-// In production, the app can use the same origin as the API backend.
+// In production, set VITE_API_URL to your backend URL (e.g. https://your-api.onrender.com).
 
 import axios from "axios";
 
 const TOKEN_KEY = "bt_token";
 
 const api = axios.create({
-  baseURL: "/api",
+  baseURL: import.meta.env.VITE_API_URL || "/api",
   headers: { "Content-Type": "application/json" },
   timeout: 8000,
   withCredentials: true, // send httpOnly cookies with every request
