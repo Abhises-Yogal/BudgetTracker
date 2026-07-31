@@ -17,6 +17,7 @@ import {
   fetchSummary,
   createTransaction,
   deleteTransaction,
+  logoutUser,
 } from "./services/api";
 import { formatPlainAmount } from "./utils/formatCurrency";
 
@@ -77,8 +78,9 @@ export default function App() {
     }
   }
 
-  function handleLogout() {
-    logout();              // clears token + user from context and localStorage
+  async function handleLogout() {
+    try { await logoutUser(); } catch (_) { /* cookie cleared server-side */ }
+    logout();              // clears user from context and localStorage
     navigate("/login", { replace: true });
   }
 

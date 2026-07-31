@@ -5,13 +5,11 @@
 import jwt from "jsonwebtoken";
 
 export function requireAuth(req, res, next) {
-  const header = req.headers.authorization;
+  const token = req.cookies?.bt_token;
 
-  if (!header || !header.startsWith("Bearer ")) {
+  if (!token) {
     return res.status(401).json({ ok: false, error: "No token — please log in" });
   }
-
-  const token = header.slice(7); // strip "Bearer "
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);

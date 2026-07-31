@@ -7,25 +7,32 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import { connectDB } from "./config/db.js";
 import authRoutes        from "./routes/auth.js";
 import transactionRoutes from "./routes/transactions.js";
 
 const PORT = process.env.PORT || 3001;
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
+const allowedOrigins = ["http://localhost:5173",process.env.FRONTEND_URL,].filter(Boolean);
 
 const app = express();
 
 // Global middleware
 app.use(
   cors({
-    origin: CLIENT_ORIGIN,
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin))
+      return callback(null, true);
+      return callback(new Error("Not allowed by CORS policy"));
+    },
     methods: ["GET", "POST", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"], // Authorization added for JWT
+    allowedHeaders: ["Content-Type"],
+    credentials: true, // tells browser to send the bt_token cookie
   })
 );
 
 app.use(express.json()); // parse application/json bodies
+app.use(cookieParser()); // parse cookies from incoming requests
 
 // Health check 
 app.get("/api/health", (_req, res) => {
@@ -60,15 +67,15 @@ async function start() {
       console.log(`
   Budget Tracker API
   ─────────────────────────────────────
-  ➜  Health    GET  http://localhost:${PORT}/api/health
-  ➜  Register    POST http://localhost:${PORT}/api/auth/register
-  ➜  Login     POST http://localhost:${PORT}/api/auth/login
-  ➜  List      GET  http://localhost:${PORT}/api/transactions?month=YYYY-MM
-  ➜  Summary   GET  http://localhost:${PORT}/api/transactions/summary?month=YYYY-MM
-  ➜  Create   POST  http://localhost:${PORT}/api/transactions
-  ➜  Delete DELETE  http://localhost:${PORT}/api/transactions/:id
-  ─────────────────────────────────────
-  ➜  CORS: ${CLIENT_ORIGIN}
+  ➜  POST   /api/auth/register
+  ➜  POST   /api/auth/login
+  ➜  POST   /api/auth/logout
+  ➜  GET    /api/transactions?month=YYYY-MM   [auth]
+  ➜  GET    /api/transactions/summary          [auth]
+  ➜  POST   /api/transactions                  [auth]
+  ➜  DELETE /api/transactions/:id              [auth]
+  ──────────────────────────────────────────────────
+  ➜  Allowed origins: ${allowedOrigins.join(", ")}
       `);
     });
   } catch (err) {

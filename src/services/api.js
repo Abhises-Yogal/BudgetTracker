@@ -10,13 +10,7 @@ const api = axios.create({
   baseURL: "/api",
   headers: { "Content-Type": "application/json" },
   timeout: 8000,
-});
-
-// Request interceptor: inject token
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
+  withCredentials: true, // send httpOnly cookies with every request
 });
 
 // Response interceptor: handle expired / invalid token
@@ -24,7 +18,6 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem("bt_user");
       // Hard redirect: clears all React state cleanly
       window.location.replace("/login");
@@ -37,12 +30,16 @@ api.interceptors.response.use(
 
 export async function registerUser({ name, email, password }) {
   const { data } = await api.post("/auth/register", { name, email, password });
-  return data; // { ok, token, user }
+  return data; // { ok, user }
 }
 
 export async function loginUser({ email, password }) {
   const { data } = await api.post("/auth/login", { email, password });
-  return data; // { ok, token, user }
+  return data; // { ok, user }
+}
+
+export async function logoutUser() {
+  await api.post("/auth/logout"); // server clears the httpOnly cookie
 }
 
 // Transactions
@@ -52,7 +49,7 @@ export async function loginUser({ email, password }) {
 export async function fetchTransactions(month) {
   const params = month ? { month } : {};
   const { data } = await api.get("/transactions", { params });
-  return data.transactions; // array
+  return data.transactions;
 }
 
 // fetchSummary(month?): GET /api/transactions/summary?month=YYYY-MM

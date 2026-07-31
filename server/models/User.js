@@ -27,6 +27,11 @@ const userSchema = new mongoose.Schema(
       // Never send the hashed password back to the client
       select: false,
     },
+    // Lets you invalidate all JWTs issued before a password change
+    passwordChangedAt: {
+      type: Date,
+      select: false,
+    },
   },
   {
     timestamps: true,
@@ -37,18 +42,18 @@ const userSchema = new mongoose.Schema(
         delete ret._id;
         delete ret.__v;
         delete ret.password; // extra safety: never leak the hash
+        delete ret.passwordChangedAt; // extra safety: never leak the timestamp
         return ret;
       },
     },
   }
 );
 
-// Hash password before every save
-// Only re-hash when the password field was actually modified, so updating other fields (e.g. name) doesn't trigger an unnecessary bcrypt round.
 userSchema.pre("save", async function () {
   if (!this.isModified("password")) return;
   const salt = await bcrypt.genSalt(12);
   this.password = await bcrypt.hash(this.password, salt);
+  if (!this.isNew) this.passwordChangedAt = new Date();
 });
 
 const User = mongoose.model("User", userSchema);

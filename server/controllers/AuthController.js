@@ -4,6 +4,16 @@
 import jwt from "jsonwebtoken";
 import * as User from "../models/User.js";
 
+// Cookie config
+const COOKIE_NAME = "bt_token";
+const COOKIE_OPTIONS = {
+  httpOnly: true, // JS cannot read it
+  secure:   process.env.NODE_ENV === "production", // HTTPS only in prod
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  maxAge:   7 * 24 * 60 * 60 * 1000, // 7 days in ms
+  path:     "/",
+};
+
 // Helpers
 
 function signToken(user) {
@@ -16,7 +26,22 @@ function signToken(user) {
 
 function sendToken(res, status, user) {
   const token = signToken(user);
-  res.status(status).json({ ok: true, token, user });
+  // Cookie carries the token; body carries only the safe user object
+  res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS).status(status).json({ ok: true, user });
+}
+
+function validatePasswordStrength(password) {
+  if (password.length < 8)
+    return "Password must be at least 8 characters";
+  if (!/[A-Z]/.test(password))
+    return "Password must contain at least one uppercase letter";
+  if (!/[a-z]/.test(password))
+    return "Password must contain at least one lowercase letter";
+  if (!/\d/.test(password))
+    return "Password must contain at least one number";
+  if (!/[^A-Za-z0-9]/.test(password))
+    return "Password must contain at least one special character (!@#$…)";
+  return null;
 }
 
 // POST /api/auth/register
@@ -32,10 +57,11 @@ export async function register(req, res, next) {
       });
     }
 
-    if (password.length < 8) {
+    const passwordError = validatePasswordStrength(password);
+    if (passwordError) {
       return res.status(400).json({
         ok: false,
-        error: "Password must be at least 8 characters",
+        error: passwordError
       });
     }
 
@@ -91,4 +117,17 @@ export async function login(req, res, next) {
   } catch (err) {
     next(err);
   }
+}
+
+// POST /api/auth/logout
+export function logout(_req, res) {
+  res.clearCookie(COOKIE_NAME, {
+    httpOnly: true,
+    secure:   process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    path:     "/",
+  }).json({ 
+    ok:true, 
+    message:"Logged out" 
+  });
 }

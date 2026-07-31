@@ -30,7 +30,7 @@ export default function Login() {
     setLoading(true);
     try {
       const data = await loginUser(form);
-      login(data.token, data.user);
+      login(data.user); // cookie set by server
       navigate(from, { replace: true });
     } catch (err) {
       setError(
@@ -72,9 +72,7 @@ export default function Login() {
               className="w-full bg-paper border border-hairline rounded-sm px-3 py-2 text-sm text-ink placeholder:text-ink-soft focus:outline-none focus:border-ink" />
           </div>
 
-          {error && (
-            <p className="font-mono text-[11px] text-expense">{error}</p>
-          )}
+          {error && <p className="font-mono text-[11px] text-expense">{error}</p>}
 
           <button type="submit" disabled={loading}
             className="w-full py-2.5 bg-ink text-surface rounded-sm font-mono text-[12px] uppercase tracking-[0.14em] hover:opacity-80 disabled:opacity-40 transition-opacity">

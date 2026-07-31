@@ -7,13 +7,15 @@ export default function Register() {
   const { login } = useAuth();
   const navigate  = useNavigate();
 
-  const [form, setForm]     = useState({ name: "", email: "", password: "" });
+  const [form, setForm]     = useState({ name: "", email: "", password: "", confirm:"" });
   const [error, setError]   = useState("");
   const [loading, setLoading] = useState(false);
+  const [strength, setStrength] = useState(null);
 
   function set(field, value) {
     setError("");
     setForm((p) => ({ ...p, [field]: value }));
+    if (field === "password") setStrength(scorePassword(value));
   }
 
   async function handleSubmit(e) {
