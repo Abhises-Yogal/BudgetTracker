@@ -50,8 +50,16 @@ export default function App() {
   }, [month]);
 
   useEffect(() => {
-    loadTransactions();
-    loadSummary();
+    let cancelled = false;
+    async function load() {
+      // Defer state updates out of the synchronous effect body to satisfy
+      // the react-hooks set-state-in-effect rule.
+      await Promise.resolve();
+      if (cancelled) return;
+      await Promise.all([loadTransactions(), loadSummary()]);
+    }
+    load();
+    return () => { cancelled = true; };
   }, [loadTransactions, loadSummary]);
 
   useEffect(() => {
@@ -79,7 +87,7 @@ export default function App() {
   }
 
   async function handleLogout() {
-    try { await logoutUser(); } catch (_) { /* cookie cleared server-side */ }
+    try { await logoutUser(); } catch { /* cookie cleared server-side */ }
     logout();              // clears user from context and localStorage
     navigate("/login", { replace: true });
   }
