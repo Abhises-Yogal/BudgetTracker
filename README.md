@@ -1,4 +1,4 @@
-# Budget Tracker
+# DimeTime
 
 A full-stack personal finance app. Track income and expenses, filter by month, and visualise spending by category — all scoped per user with JWT authentication via secure httpOnly cookies.
 

@@ -7,8 +7,6 @@ export default function Login() {
   const { login }  = useAuth();
   const navigate   = useNavigate();
   const location   = useLocation();
-
-  // Send the user back to wherever they were trying to go before being redirected to /login, or fall back to the dashboard.
   const from = location.state?.from?.pathname ?? "/";
 
   const [form, setForm]       = useState({ email: "", password: "" });

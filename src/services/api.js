@@ -70,3 +70,10 @@ export async function deleteTransaction(id) {
   const { data } = await api.delete(`/transactions/${id}`);
   return data.deleted;
 }
+
+//AI Insights
+
+export async function fetchAiAdvice({ transactions, month }) {
+  const { data } = await api.post("/ai/analyse", { transactions, month });
+  return data; // { ok, advice, model }
+}

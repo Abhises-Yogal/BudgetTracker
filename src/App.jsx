@@ -1,9 +1,3 @@
-// Orchestrates all data fetching via the Axios service layer.
-//  Two parallel fetches on mount (and on month change):
-//   - fetchTransactions(month) → transaction list
-//   - fetchSummary(month)      → totals + byCategory for the chart
-// Loading and error states are tracked independently per-panel so a summary failure doesn't blank the transaction list.
-
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
@@ -11,6 +5,7 @@ import BalanceSummary     from "./components/BalanceSummary";
 import TransactionList    from "./components/TransactionList";
 import AddTransactionForm from "./components/AddTransactionForm";
 import SpendingChart      from "./components/SpendingChart";
+import AiInsights        from "./components/AiInsights";
 import MonthFilter        from "./components/MonthFilter";
 import {
   fetchTransactions,
@@ -52,8 +47,6 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      // Defer state updates out of the synchronous effect body to satisfy
-      // the react-hooks set-state-in-effect rule.
       await Promise.resolve();
       if (cancelled) return;
       await Promise.all([loadTransactions(), loadSummary()]);
@@ -133,6 +126,7 @@ export default function App() {
           <BalanceSummary income={summary.totalIncome} expenses={summary.totalExpenses} loading={loadingChart} />
           <AddTransactionForm onAdd={handleAdd} disabled={loadingList} />
           <SpendingChart byCategory={summary.byCategory} loading={loadingChart} />
+          <AiInsights transactions={transactions} month={month || undefined} />
           <TransactionList transactions={transactions} onDelete={handleDelete} loading={loadingList} />
         </div>
       </main>

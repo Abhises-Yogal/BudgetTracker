@@ -11,8 +11,10 @@ import cookieParser from "cookie-parser";
 import { connectDB } from "./config/db.js";
 import authRoutes        from "./routes/auth.js";
 import transactionRoutes from "./routes/transactions.js";
+import aiRoutes          from "./routes/ai.js";
 
 const PORT = process.env.PORT || 3001;
+
 const allowedOrigins = [
   "http://localhost:5173",
   process.env.FRONTEND_URL,
@@ -43,7 +45,7 @@ app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
     uptime: Math.round(process.uptime()),
-    environment: process.env.NODE_ENV
+    env: process.env.NODE_ENV
   });
 });
 
@@ -64,6 +66,7 @@ app.get("/", (_req, res) => {
         list: "GET /api/transactions?month=YYYY-MM",
         summary: "GET /api/transactions/summary?month=YYYY-MM",
         create: "POST /api/transactions",
+        aiAnalyse: "POST /api/ai/analyse",
         delete: "DELETE /api/transactions/:id"
       }
     }
@@ -73,6 +76,7 @@ app.get("/", (_req, res) => {
 // Routes 
 app.use("/api/auth",         authRoutes);
 app.use("/api/transactions", transactionRoutes);
+app.use("/api/ai",           aiRoutes);
 
 // 404 catch-all
 app.use((_req, res) => {
@@ -100,6 +104,7 @@ async function start() {
   ➜  GET    /api/transactions?month=YYYY-MM   [auth]
   ➜  GET    /api/transactions/summary          [auth]
   ➜  POST   /api/transactions                  [auth]
+  ➜  POST   /api/ai/analyse                    [auth]
   ➜  DELETE /api/transactions/:id              [auth]
   ──────────────────────────────────────────────────
   ➜  Allowed origins: ${allowedOrigins.join(", ")}
