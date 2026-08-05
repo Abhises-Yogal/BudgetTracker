@@ -5,9 +5,32 @@
 import axios from "axios";
 
 // Prefer runtime-injected value (window.__API_URL) if present, then VITE_API_URL, then relative /api
-const initialBase = (typeof window !== "undefined" && window.__API_URL)
+function ensureApiRoot(base) {
+  if (!base) return base;
+  // Keep relative values as-is ("/api" is expected)
+  if (base.startsWith("/")) return base.replace(/\/+$|\/+$/g, "").startsWith('/api') ? '/api' : base;
+
+  try {
+    const url = new URL(base);
+    // If the path already contains /api, assume it's correct
+    if (url.pathname.includes('/api')) {
+      // normalize trailing slash
+      return base.replace(/\/+$/, '');
+    }
+    // Append /api to the path
+    url.pathname = url.pathname.replace(/\/+$/, '') + '/api';
+    return url.toString().replace(/\/+$/, '');
+  } catch (e) {
+    // Not a full URL, return as-is
+    return base;
+  }
+}
+
+const rawInitial = (typeof window !== "undefined" && window.__API_URL)
   ? window.__API_URL
   : import.meta.env.VITE_API_URL || "/api";
+
+const initialBase = ensureApiRoot(rawInitial);
 
 const api = axios.create({
   baseURL: initialBase,
@@ -23,11 +46,14 @@ if (typeof window !== "undefined") {
     .then((r) => r.ok ? r.json() : null)
     .then((cfg) => {
       const runtime = cfg?.VITE_API_URL;
-      if (runtime && runtime !== api.defaults.baseURL) {
-        api.defaults.baseURL = runtime;
-        // Optional: expose for debugging
-        window.__API_URL = runtime;
-        console.info("Runtime API URL loaded:", runtime);
+      if (runtime) {
+        const normalized = ensureApiRoot(runtime);
+        if (normalized && normalized !== api.defaults.baseURL) {
+          api.defaults.baseURL = normalized;
+          // Optional: expose for debugging
+          window.__API_URL = normalized;
+          console.info("Runtime API URL loaded:", normalized);
+        }
       }
     })
     .catch(() => {

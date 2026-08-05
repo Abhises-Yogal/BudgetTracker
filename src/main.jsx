@@ -8,26 +8,45 @@ import Login            from "./pages/Login";
 import Register         from "./pages/Register";
 import "./index.css";
 
-createRoot(document.getElementById("root")).render(
-  <StrictMode>
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/login"    element={<Login />} />
-          <Route path="/register" element={<Register />} />
+async function loadRuntimeConfig() {
+  if (typeof window === "undefined") return;
+  try {
+    const res = await fetch('/runtime-config.json', { cache: 'no-store' });
+    if (!res.ok) return;
+    const cfg = await res.json();
+    if (cfg?.VITE_API_URL) {
+      window.__API_URL = cfg.VITE_API_URL;
+      console.info('Loaded runtime API URL:', cfg.VITE_API_URL);
+    }
+  } catch (e) {
+    // ignore - runtime config is optional
+  }
+}
 
-          {/* Protected dashboard */}
-          <Route path="/" element={
-            <ProtectedRoute>
-              <App />
-            </ProtectedRoute>
-          } />
+(async () => {
+  await loadRuntimeConfig();
 
-          {/* Catch-all */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
-  </StrictMode>
-);
+  createRoot(document.getElementById("root")).render(
+    <StrictMode>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Public routes */}
+            <Route path="/login"    element={<Login />} />
+            <Route path="/register" element={<Register />} />
+
+            {/* Protected dashboard */}
+            <Route path="/" element={
+              <ProtectedRoute>
+                <App />
+              </ProtectedRoute>
+            } />
+
+            {/* Catch-all */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </StrictMode>
+  );
+})();
