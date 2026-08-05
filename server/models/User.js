@@ -49,19 +49,23 @@ const userSchema = new mongoose.Schema(
   }
 );
 
+const SALT_ROUNDS = 12;
+
 userSchema.pre("save", function (next) {
   if (!this.isModified("password")) return next();
 
-  const doc = this;
-  bcrypt.genSalt(12, (saltErr, salt) => {
-    if (saltErr) return next(saltErr);
-    bcrypt.hash(doc.password, salt, (hashErr, hash) => {
-      if (hashErr) return next(hashErr);
-      doc.password = hash;
-      if (!doc.isNew) doc.passwordChangedAt = new Date();
-      next();
-    });
-  });
+  // Use synchronous bcrypt so the hash is applied before the document is
+  // persisted. The previous async callback version could fire after the
+  // save resolved (and after `next` was no longer valid), causing
+  // "TypeError: next is not a function" and leaving the password un-hashed —
+  // which made login always fail with 401.
+  try {
+    this.password = bcrypt.hashSync(this.password, SALT_ROUNDS);
+    if (!this.isNew) this.passwordChangedAt = new Date();
+    next();
+  } catch (err) {
+    next(err);
+  }
 });
 
 const User = mongoose.model("User", userSchema);
@@ -84,8 +88,16 @@ export async function findByEmail(email) {
 
 // verifyPassword(plain, hashed)
 // Compares a plain-text password against the stored bcrypt hash.
+// Defensive: if the stored value isn't a valid bcrypt hash (e.g. legacy
+// plaintext or a corrupted record), return false instead of throwing so a
+// login attempt fails cleanly with 401 rather than a 500.
 export async function verifyPassword(plain, hashed) {
-  return bcrypt.compare(plain, hashed);
+  if (!plain || !hashed || typeof hashed !== "string") return false;
+  try {
+    return bcrypt.compareSync(plain, hashed);
+  } catch {
+    return false;
+  }
 }
 
 export default User;
