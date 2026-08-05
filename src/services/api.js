@@ -1,15 +1,39 @@
 // Single Axios instance for all API calls.
 // In development, Vite is configured to proxy /api/* to localhost:3001.
-// In production, set VITE_API_URL to your backend URL (e.g. https://your-api.onrender.com).
+// In production, set VITE_API_URL at build time OR provide a runtime /runtime-config.json
 
 import axios from "axios";
 
+// Prefer runtime-injected value (window.__API_URL) if present, then VITE_API_URL, then relative /api
+const initialBase = (typeof window !== "undefined" && window.__API_URL)
+  ? window.__API_URL
+  : import.meta.env.VITE_API_URL || "/api";
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "/api",
+  baseURL: initialBase,
   headers: { "Content-Type": "application/json" },
   timeout: 8000,
   withCredentials: true, // send httpOnly cookies with every request
 });
+
+// Try to load runtime config non-blocking. If /runtime-config.json exists and contains VITE_API_URL,
+// update the axios instance baseURL so the app can be re-pointed without rebuilding the bundle.
+if (typeof window !== "undefined") {
+  fetch("/runtime-config.json", { cache: "no-store" })
+    .then((r) => r.ok ? r.json() : null)
+    .then((cfg) => {
+      const runtime = cfg?.VITE_API_URL;
+      if (runtime && runtime !== api.defaults.baseURL) {
+        api.defaults.baseURL = runtime;
+        // Optional: expose for debugging
+        window.__API_URL = runtime;
+        console.info("Runtime API URL loaded:", runtime);
+      }
+    })
+    .catch(() => {
+      // ignore - runtime config is optional
+    });
+}
 
 // Response interceptor: handle expired / invalid token
 api.interceptors.response.use(
