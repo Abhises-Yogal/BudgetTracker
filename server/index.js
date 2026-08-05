@@ -8,6 +8,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import mongoose from "mongoose";
 import { connectDB } from "./config/db.js";
 import authRoutes        from "./routes/auth.js";
 import transactionRoutes from "./routes/transactions.js";
@@ -44,7 +45,10 @@ app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
     uptime: Math.round(process.uptime()),
-    env: process.env.NODE_ENV
+    env: process.env.NODE_ENV,
+    db: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+    gitCommit: process.env.GIT_COMMIT || "unknown",
+    mongodbUri: process.env.MONGODB_URI ? "set" : "NOT SET"
   });
 });
 
