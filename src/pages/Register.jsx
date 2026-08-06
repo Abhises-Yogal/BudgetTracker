@@ -28,7 +28,7 @@ export default function Register() {
   function set(field, value) {
     setError("");
     setForm((p) => ({ ...p, [field]: value }));
-    if (field === "password" || field === "confirm") {
+    if (field === "password") {
       setStrength(scorePassword(value));
     }
   }

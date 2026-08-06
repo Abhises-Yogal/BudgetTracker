@@ -9,8 +9,8 @@ const TIMEOUT = 25_000; // 25 s — Groq is fast but give breathing room
 
 // POST /api/ai/analyse
 export async function analyse(req, res, next) {
-  // If the Groq client is not available (missing API key), return a clear 503 so the app stays up
-  if (!groq?.available) {
+  // groq.available is false only on the safe stub (missing API key)
+  if (groq.available === false) {
     return res.status(503).json({ ok: false, error: "AI service unavailable: GROQ_API_KEY not configured." });
   }
 
