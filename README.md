@@ -9,8 +9,8 @@ A full-stack personal finance app. Track income and expenses, filter by month, a
 | Service | URL |
 |---|---|
 | Frontend (Netlify) | https://dimetime.netlify.app |
-| Backend API (Render) | https://budgettracker-7whc.onrender.com |
-| Health check | https://budgettracker-7whc.onrender.com/api/health |
+| Backend API (Render) | https://budgettracker-1-i3st.onrender.com |
+| Health check | https://budgettracker-1-i3st.onrender.com/api/health |
 
 The frontend reads the backend URL from a runtime config file (`public/runtime-config.json`), so it can be re-pointed without rebuilding.
 
@@ -268,7 +268,7 @@ Regardless of host, configure these on the backend service (Render, Fly.io, Hero
 3. Publish directory: `dist`.
 4. The backend URL is supplied at runtime via `public/runtime-config.json`:
    ```json
-   { "VITE_API_URL": "https://budgettracker-7whc.onrender.com/api" }
+   { "VITE_API_URL": "https://budgettracker-1-i3st.onrender.com/api" }
    ```
    This lets you re-point the API without rebuilding the bundle. In production, make sure this points to your deployed API — and that the value in `FRONTEND_URL` on the backend matches the deployed frontend origin exactly.
 5. Add a `_redirects` file in `public/`:

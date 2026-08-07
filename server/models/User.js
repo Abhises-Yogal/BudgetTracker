@@ -51,21 +51,12 @@ const userSchema = new mongoose.Schema(
 
 const SALT_ROUNDS = 12;
 
-userSchema.pre("save", function (next) {
-  if (!this.isModified("password")) return next();
+userSchema.pre("save", function () {
+  if (!this.isModified("password")) return;
 
-  // Use synchronous bcrypt so the hash is applied before the document is
-  // persisted. The previous async callback version could fire after the
-  // save resolved (and after `next` was no longer valid), causing
-  // "TypeError: next is not a function" and leaving the password un-hashed —
-  // which made login always fail with 401.
-  try {
-    this.password = bcrypt.hashSync(this.password, SALT_ROUNDS);
-    if (!this.isNew) this.passwordChangedAt = new Date();
-    next();
-  } catch (err) {
-    next(err);
-  }
+  // Use synchronous bcrypt so the hash is applied before the document is persisted.
+  this.password = bcrypt.hashSync(this.password, SALT_ROUNDS);
+  if (!this.isNew) this.passwordChangedAt = new Date();
 });
 
 const User = mongoose.model("User", userSchema);
